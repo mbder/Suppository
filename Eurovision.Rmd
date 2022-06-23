@@ -1,0 +1,136 @@
+---
+title: "Eurovision"
+author: "Bdér"
+date: "`r Sys.Date()`"
+output: html_document
+---
+Load in data 
+```{r}
+library(dplyr)
+library(ggplot2)
+install.packages("remotes")
+library(remotes)
+
+install.packages("forcats")
+install.packages("ggplot.multistats" )
+library(ggplot2)
+library(forcats)
+library(dplyr)
+
+library(ggflags)
+
+
+install_github("https://github.com/jimjam-slam/ggflags")
+
+eurovision <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-05-17/eurovision.csv')
+
+View(eurovision)
+```
+
+Looking at data
+```{r}
+glimpse(eurovision)
+head(eurovision)
+
+#find unique values of a vector 
+unique(eurovision$section)
+
+eurovision_finals = eurovision %>% filter(section=="grand-final" | section == "final")   
+
+View(eurovision_finals)
+```
+
+Find most wins 
+```{r}
+eurovision_finals %>% 
+  filter(winner == TRUE) %>% 
+  count(artist_country, year) %>% 
+  arrange(desc(year))
+
+#GET FLAGS
+
+library(ggflags)
+library(ggplot2)
+flags=eurovision_finals$country_emoji
+flags
+
+flag_clean = gsub(":flag_","",x=flags) %>% gsub(":","",x=.)
+eurovision_finals$flag_clean = flag_clean
+flag_clean
+
+
+artist_flags= eurovision_finals %>% select(artist_country,flag_clean) %>% 
+  filter(!duplicated(flag_clean)) #this joins but removes duplicates
+
+                     
+eurovision$winner_int=as.integer(eurovision$winner)
+#now filter for final and grand-final, agg by country
+unique(eurovision$section) 
+#calculate avg points and rank, and total wins and year
+country_agg = eurovision %>% 
+  filter(section == "final" | section == "grand-final") %>% 
+  group_by(artist_country) %>%
+  summarise(avg_points = mean(total_points, na.rm = TRUE),
+            avg_rank = mean(rank, na.rm = TRUE),
+            tot_wins = sum(winner_int, na.rm = TRUE),
+            tot_years = n()) %>% 
+  arrange(desc(tot_wins)) %>% 
+  #calc winr ation (tot_wins/tot_years(
+  mutate(win_ratio = (tot_wins/tot_years)*100)%>%
+  arrange(desc(win_ratio))
+
+country_agg 
+
+
+country_agg = left_join(country_agg,artist_flags,by="artist_country")
+
+ 
+
+artist_flags%>% 
+  filter(artist_country %in% country_agg)
+
+
+
+country_agg %>% 
+  filter(tot_wins > 0) %>%
+  mutate(artist_country = fct_reorder(artist_country, win_ratio)) %>% 
+  ggplot(aes(x = win_ratio, y = artist_country))+ 
+  geom_bar(stat = "identity") + 
+  scale_x_continuous(breaks =1:20)
+           
+#ABOVE-USE FCT_REORDER TO REORDER BARPLOT
+
+country_agg %>% 
+  filter(tot_wins > 0) %>% 
+  ggplot(aes(x=avg_points, y=win_ratio,colour=artist_country))+
+  geom_point()
+
+
+
+```
+
+
+```{r}
+
+
+#ADD INTO COUNTRY_AGG DATA
+euplot= country_agg %>% 
+  filter(tot_wins > 0) %>% 
+  ggplot(aes(x=avg_points, y=win_ratio,country=flag_clean))+
+  geom_flag() +
+  labs(titles="Eurovision Countries Win Ratios", 
+       x="Average Points per Country",
+       y="Countries Percent Win Ratio",
+       caption = "Mohamad Bdér MISDI Code Camp") +
+  scale_x_continuous(breaks = seq(from=0, to = 200, by =25)) +
+  #scale_y_continuous(breaks = seq(from=0, to = 20, by =20)) + 
+  theme_minimal(base_family = "Avenir")
+
+euplot
+
+ggsave(filename ="eurovision.png",euplot,
+       units="px",dpi=320,bg="white",
+       width= 2500, height=2500)```
+
+```
+
