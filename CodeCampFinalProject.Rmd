@@ -1,0 +1,91 @@
+---
+title: "imdb_project"
+author: "Bdér"
+date: "`r Sys.Date()`"
+output: html_document
+---
+```{r}
+# load libraries
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(forcats)
+
+# load imdb and bechdel
+movies_imdb <- read_csv("https://raw.githubusercontent.com/andrewmoles2/rTrainIntroduction/main/r-data-wrangling-1/data/IMDb%20movies.csv")
+
+
+#find year Netflix (USA) started producing original content 
+netflix = movies_imdb %>% 
+  filter(movies_imdb$production_company == "Netflix") %>%
+  filter("USA" %in% country)
+
+netflixmin=min(netflix$year)
+
+
+#top production companies in n films produced all time
+production_co_summary = movies_imdb %>%
+  filter("USA" %in% country)%>%
+  na.omit()%>%
+  count(production_company,sort = TRUE,) 
+
+#top production companies in n films produced since 2015 
+production_co_summary_2015 = movies_imdb %>%
+  filter("USA" %in% country,year>=2015)%>%
+  na.omit()%>%
+  count(production_company,sort = TRUE,) 
+
+
+#find the top 40 production companies in n films produced all time
+top_40_productionco=head(production_co_summary,40)
+
+#find the top 40 production companies in n films produced since 2015
+top_40_productionco_2015=head(production_co_summary_2015,40)
+
+#make into vectors 
+top_40_all_vec=c(top_40_productionco$production_company, "Netflix")
+top_40_2015_vec=c(top_40_productionco_2015$production_company, "Netflix")
+
+#filter in imovie database top 40 all
+movies_imdb_top40 = movies_imdb %>% filter(production_company %in% top_40_all_vec ) %>% filter(year>=2015, "USA" %in% country)
+
+#filter in imovie database top 40 since 2015
+movies_imdb_top40_2015 = movies_imdb %>% filter(production_company %in% top_40_2015_vec) %>% filter(year>=2015, "USA" %in% country)
+
+
+
+#find vote aggregate top 20 all 
+productionco_avg_vote=movies_imdb_top40 %>%
+  filter("USA"%in% country) %>%
+  group_by(production_company) %>%
+  summarise(productionco_agg_vote = median(avg_vote),
+            count_n = n()) 
+
+productionco_avg_vote=head(productionco_avg_vote,20)
+           
+#find vote aggregate top 20 all 
+productionco_avg_vote_2015=movies_imdb_top40_2015 %>%
+  filter("USA"%in% country) %>%
+  group_by(production_company) %>%
+  summarise(productionco_agg_vote = median(avg_vote),
+            count_n = n()) 
+
+
+productionco_avg_vote_2015=head(productionco_avg_vote_2015,20)
+
+install.packages("gghighlight")
+library(gghighlight)
+
+#make into plot all
+plot_all=ggplot(productionco_avg_vote,aes(x=production_company,y=productionco_agg_vote,fill=production_company))+geom_bar(stat="identity")+coord_flip() + gghighlight(production_company == "Netflix")+ labs(title="Are Streaming Platforms the Producers of the People? (all)", x="Production Co", y= "Avg. Movie Vote")
+
+
+#make into plot 2015
+plot_2015=ggplot(productionco_avg_vote_2015,aes(x=production_company,y=productionco_agg_vote, fill=production_company,))+geom_bar(stat="identity")+coord_flip()+ gghighlight(production_company == "Amazon Studios") + labs(title="Are Streaming Platforms the Producers of the People? (2015)", x="Production Co", y= "Avg. Movie Vote") 
+
+ggsave(filename="StreamingPlotAll.png",plot_all,units="px",dpi=320,bg="white",width=2500,height=2500)
+
+ggsave(filename="StreamingPlot2015.png",plot_2015,units="px",dpi =320,bg="white",width=2500,height=2500)
+
+#donee
+```
